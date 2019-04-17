@@ -1,6 +1,7 @@
 package vapp.ofbusiness.com.ofbgiotag;
 
 import android.Manifest;
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -8,6 +9,8 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 import android.media.ExifInterface;
 import android.net.Uri;
@@ -22,6 +25,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -42,6 +46,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -51,20 +56,24 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private final int requestCode = 20;
     private View acceptOrRejectContainer;
     private Button acceptButton, rejectButton, capturedImageButton;
+    private TextView geoAddress;
+    private TextView mapWarningView;
 
     GoogleMap mGoogleMap;
     SupportMapFragment mapFrag;
     LocationRequest mLocationRequest;
-    Location mLastLocation;
-    Marker mCurrLocationMarker;
+    Location lastKnownLocation;
+    Marker mapMarker;
     FusedLocationProviderClient mFusedLocationClient;
 
     String imgLat = "";
     String imgLong = "";
     String imgLatRef = "";
     String imgLongRef = "";
-    float geoTaggedLat;
-    float geoTaggedLong;
+    Float geoTaggedLat;
+    Float geoTaggedLong;
+
+    private boolean isGeotaggedLocation;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,9 +85,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         acceptOrRejectContainer = findViewById(R.id.accept_or_reject_container);
         acceptButton = findViewById(R.id.accept_button);
         rejectButton = findViewById(R.id.reject_button);
+        geoAddress = findViewById(R.id.address_tv);
+        mapWarningView = findViewById(R.id.map_error_view);
 
         capturedImageButton.setVisibility(View.VISIBLE);
+        geoAddress.setVisibility(View.GONE);
         acceptOrRejectContainer.setVisibility(View.GONE);
+        mapWarningView.setVisibility(View.VISIBLE);
+        mapWarningView.setText("This is your current Location. If you're not satisfied please find manually by clicking here.");
         capturedImageButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -100,6 +114,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         });
 
+        mapWarningView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent i = new Intent(getBaseContext(), ChooseLocation.class);
+                startActivity(i);
+            }
+        });
+
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         mapFrag = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mapFrag.getMapAsync(this);
@@ -110,7 +132,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         Intent photoCaptureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         startActivityForResult(photoCaptureIntent, requestCode);
     }
-
 
     @Override
     public void onPause() {
@@ -165,10 +186,29 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             mGoogleMap.clear();
             capturedImageButton.setVisibility(View.GONE);
             acceptOrRejectContainer.setVisibility(View.VISIBLE);
-            addMarker(geoTaggedLat, geoTaggedLong, "Clicked Image Location");
-            if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                     mGoogleMap.setMyLocationEnabled(false);
+            mapWarningView.setVisibility(View.GONE);
+            geoAddress.setVisibility(View.VISIBLE);
+            if((geoTaggedLat == null && geoTaggedLong == null) || (geoTaggedLat.equals(0.0) && geoTaggedLong.equals(0.0))) {
+                isGeotaggedLocation = false;
+                Toast.makeText(this,"Is Gio-Tagged Location - " + isGeotaggedLocation,Toast.LENGTH_LONG).show();
+                geoTaggedLong = Float.parseFloat(String.valueOf(lastKnownLocation.getLongitude()));
+                geoTaggedLat = Float.parseFloat(String.valueOf(lastKnownLocation.getLatitude()));
+                geoAddress.setText(MapUtils.getCompleteAddress(geoTaggedLat, geoTaggedLong, this));
+                MapUtils.addMarker(geoTaggedLat, geoTaggedLong, "Clicked Image Location", mapMarker, mGoogleMap);
+                if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                        mGoogleMap.setMyLocationEnabled(false);
+                    }
+                }
+            }else{
+                isGeotaggedLocation = true;
+                Toast.makeText(this,"Is Gio-Tagged Location - " + isGeotaggedLocation,Toast.LENGTH_LONG).show();
+                geoAddress.setText(MapUtils.getCompleteAddress(geoTaggedLat, geoTaggedLong, this));
+                MapUtils.addMarker(geoTaggedLat, geoTaggedLong, "Clicked Image Location", mapMarker, mGoogleMap);
+                if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                        mGoogleMap.setMyLocationEnabled(false);
+                    }
                 }
             }
         }
@@ -233,6 +273,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         mGoogleMap.getUiSettings().setZoomControlsEnabled(true);
         mGoogleMap.getUiSettings().setMyLocationButtonEnabled(true);
 
+        if (checkPermissionForExternalStorage(this)) {
+        }
+
         if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                     == PackageManager.PERMISSION_GRANTED) {
@@ -257,30 +300,56 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 //The last location in the list is the newest
                 Location location = locationList.get(locationList.size() - 1);
                 Log.i("MapsActivity", "Location: " + location.getLatitude() + " " + location.getLongitude());
-                mLastLocation = location;
-                moveCameraToLocation(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()));
+                lastKnownLocation = location;
+                MapUtils.moveCameraToLocation(new LatLng(lastKnownLocation.getLatitude(), lastKnownLocation.getLongitude()), mGoogleMap);
             }
         }
     };
 
-    private void addMarker(double latitude, double longitude, String markerTitle){
-        if (mCurrLocationMarker != null) {
-            mCurrLocationMarker.remove();
-        }
+    public static final int MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE = 123;
 
-        //Place current location marker
-        LatLng latLng = new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude());
-        MarkerOptions markerOptions = new MarkerOptions();
-        markerOptions.position(latLng);
-        markerOptions.title(markerTitle);
-        markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
-        mCurrLocationMarker = mGoogleMap.addMarker(markerOptions);
-        moveCameraToLocation(latLng);
+    private boolean checkPermissionForExternalStorage(final Context context){
+        int currentAPIVersion = Build.VERSION.SDK_INT;
+        if (currentAPIVersion >= android.os.Build.VERSION_CODES.M) {
+            if (ContextCompat.checkSelfPermission(context,
+                    Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                if (ActivityCompat.shouldShowRequestPermissionRationale((Activity) context,
+                        Manifest.permission.READ_EXTERNAL_STORAGE)) {
+                    showDialog("External storage", context,
+                            Manifest.permission.READ_EXTERNAL_STORAGE);
+
+                } else {
+                    ActivityCompat
+                            .requestPermissions(
+                                    (Activity) context,
+                                    new String[] { Manifest.permission.READ_EXTERNAL_STORAGE },
+                                    MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE);
+                }
+                return false;
+            } else {
+                return true;
+            }
+
+        } else {
+            return true;
+        }
     }
 
-    private void moveCameraToLocation(LatLng latLng){
-        //move map camera
-        mGoogleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, DEFAULT_CAMERA_ZOOM));
+    public void showDialog(final String msg, final Context context, final String permission) {
+        AlertDialog.Builder alertBuilder = new AlertDialog.Builder(context);
+        alertBuilder.setCancelable(true);
+        alertBuilder.setTitle("Permission necessary");
+        alertBuilder.setMessage(msg + " permission is necessary");
+        alertBuilder.setPositiveButton(android.R.string.yes,
+                new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        ActivityCompat.requestPermissions((Activity) context,
+                                new String[] { permission },
+                                MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE);
+                    }
+                });
+        AlertDialog alert = alertBuilder.create();
+        alert.show();
     }
 
     public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
@@ -347,6 +416,15 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }
                 return;
             }
+
+            case MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE:
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    // do your stuff
+                } else {
+                    Toast.makeText(MainActivity.this, "GET_ACCOUNTS Denied",
+                            Toast.LENGTH_SHORT).show();
+                }
+                break;
         }
     }
 }

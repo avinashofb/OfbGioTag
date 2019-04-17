@@ -2,4 +2,5 @@
     <string name="app_name">OfbGioTag</string>
     <string name="title_activity_maps">Map</string>
     <string name="google_maps_key">AIzaSyC5cezni_LeKBxz_Yl4n5MNX97Sv2hbtBo</string>
+    <string name="title_activity_choose_location">Map</string>
 </resources>
