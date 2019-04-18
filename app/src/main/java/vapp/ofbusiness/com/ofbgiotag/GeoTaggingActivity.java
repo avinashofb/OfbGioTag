@@ -9,8 +9,6 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
-import android.location.Address;
-import android.location.Geocoder;
 import android.location.Location;
 import android.media.ExifInterface;
 import android.net.Uri;
@@ -33,22 +31,18 @@ import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
-import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
-import com.google.android.gms.maps.model.MarkerOptions;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-import java.util.Locale;
 
-public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
+public class GeoTaggingActivity extends AppCompatActivity implements OnMapReadyCallback {
 
     private static float DEFAULT_CAMERA_ZOOM = 18f;
 
@@ -117,8 +111,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         mapWarningView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent i = new Intent(getBaseContext(), ChooseLocation.class);
-                startActivity(i);
+                Intent intent = new Intent(getBaseContext(), ChooseLocationActivity.class);
+                intent.putExtra("LAT", lastKnownLocation.getLatitude());
+                intent.putExtra("LONG", lastKnownLocation.getLongitude());
+                startActivity(intent);
             }
         });
 
@@ -129,8 +125,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     private void openCamera(){
-        Intent photoCaptureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        startActivityForResult(photoCaptureIntent, requestCode);
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        startActivityForResult(intent, requestCode);
     }
 
     @Override
@@ -194,7 +190,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 geoTaggedLong = Float.parseFloat(String.valueOf(lastKnownLocation.getLongitude()));
                 geoTaggedLat = Float.parseFloat(String.valueOf(lastKnownLocation.getLatitude()));
                 geoAddress.setText(MapUtils.getCompleteAddress(geoTaggedLat, geoTaggedLong, this));
-                MapUtils.addMarker(geoTaggedLat, geoTaggedLong, "Clicked Image Location", mapMarker, mGoogleMap);
+                MapUtils.addMarker(geoTaggedLat, geoTaggedLong, "Clicked Image Location", mapMarker, mGoogleMap, BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
                 if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                         mGoogleMap.setMyLocationEnabled(false);
@@ -204,7 +200,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 isGeotaggedLocation = true;
                 Toast.makeText(this,"Is Gio-Tagged Location - " + isGeotaggedLocation,Toast.LENGTH_LONG).show();
                 geoAddress.setText(MapUtils.getCompleteAddress(geoTaggedLat, geoTaggedLong, this));
-                MapUtils.addMarker(geoTaggedLat, geoTaggedLong, "Clicked Image Location", mapMarker, mGoogleMap);
+                MapUtils.addMarker(geoTaggedLat, geoTaggedLong, "Clicked Image Location", mapMarker, mGoogleMap, BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
                 if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                         mGoogleMap.setMyLocationEnabled(false);
@@ -301,7 +297,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 Location location = locationList.get(locationList.size() - 1);
                 Log.i("MapsActivity", "Location: " + location.getLatitude() + " " + location.getLongitude());
                 lastKnownLocation = location;
-                MapUtils.moveCameraToLocation(new LatLng(lastKnownLocation.getLatitude(), lastKnownLocation.getLongitude()), mGoogleMap);
+                MapUtils.moveCameraToLocation(lastKnownLocation.getLatitude(), lastKnownLocation.getLongitude(), mGoogleMap);
             }
         }
     };
@@ -372,7 +368,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                             @Override
                             public void onClick(DialogInterface dialogInterface, int i) {
                                 //Prompt the user once explanation has been shown
-                                ActivityCompat.requestPermissions(MainActivity.this,
+                                ActivityCompat.requestPermissions(GeoTaggingActivity.this,
                                         new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
                                         MY_PERMISSIONS_REQUEST_LOCATION);
                             }
@@ -421,7 +417,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     // do your stuff
                 } else {
-                    Toast.makeText(MainActivity.this, "GET_ACCOUNTS Denied",
+                    Toast.makeText(GeoTaggingActivity.this, "GET_ACCOUNTS Denied",
                             Toast.LENGTH_SHORT).show();
                 }
                 break;

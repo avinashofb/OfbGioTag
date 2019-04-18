@@ -4,6 +4,9 @@
     <color name="colorPrimaryDark">#00574B</color>
     <color name="colorAccent">#D81B60</color>
 
-    <color name="circleFillColor">#00ffffff</color>
+    <color name="circleFillColor">#01f1f3f4</color>
     <color name="circleStrokeColor">#454545</color>
+
+    <color name="rejectBtColor">#E53935</color>
+    <color name="acceptBtColor">#74C14A</color>
 </resources>

@@ -19,7 +19,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity android:name=".MainActivity">
+        <activity android:name=".GeoTaggingActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -39,8 +39,8 @@
             android:value="@string/google_maps_key" />
 
         <activity
-            android:name=".ChooseLocation"
-            android:label="@string/title_activity_choose_location"></activity>
+            android:name=".ChooseLocationActivity"
+            android:label="@string/title_activity_choose_locatio_new"></activity>
     </application>
 
 </manifest>
