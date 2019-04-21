@@ -90,6 +90,15 @@ public class GeoTaggingActivity extends AppCompatActivity implements OnMapReadyC
         acceptOrRejectContainer.setVisibility(View.GONE);
         mapWarningView.setVisibility(View.VISIBLE);
         mapWarningView.setText("This is your current Location. If you're not satisfied please find manually by clicking here.");
+        if(MapUtils.areThereMockPermissionApps(this)){
+                AlertDialog.Builder alertBuilder = new AlertDialog.Builder(this);
+                alertBuilder.setCancelable(false);
+                alertBuilder.setTitle("Uninstall GPS spoofing Application !");
+                alertBuilder.setMessage("Uninstall GPS Spoofing Application and disable GPS Spoofing permission.");
+                AlertDialog alert = alertBuilder.create();
+                alert.show();
+        }
+
         capturedImageButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

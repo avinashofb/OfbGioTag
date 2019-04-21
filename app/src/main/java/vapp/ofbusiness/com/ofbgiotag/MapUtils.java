@@ -1,9 +1,13 @@
 package vapp.ofbusiness.com.ofbgiotag;
 
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Address;
 import android.location.Geocoder;
+import android.provider.Settings;
 import android.util.Log;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -97,4 +101,48 @@ public class MapUtils {
         double c = 2 * Math.asin(Math.sqrt(a));
         return (rad * c) * 1000;
     }
+
+    public static boolean isMockSettingsEnabled(Context context) {
+        // returns true if mock location enabled, false if not enabled.
+        if (Settings.Secure.getString(context.getContentResolver(),
+                Settings.Secure.ALLOW_MOCK_LOCATION).equals("0"))
+            return false;
+        else
+            return true;
+    }
+
+    public static boolean areThereMockPermissionApps(Context context) {
+        int count = 0;
+
+        PackageManager pm = context.getPackageManager();
+        List<ApplicationInfo> packages =
+                pm.getInstalledApplications(PackageManager.GET_META_DATA);
+
+        for (ApplicationInfo applicationInfo : packages) {
+            try {
+                PackageInfo packageInfo = pm.getPackageInfo(applicationInfo.packageName,
+                        PackageManager.GET_PERMISSIONS);
+
+                // Get Permissions
+                String[] requestedPermissions = packageInfo.requestedPermissions;
+
+                if (requestedPermissions != null) {
+                    for (int i = 0; i < requestedPermissions.length; i++) {
+                        if (requestedPermissions[i]
+                                .equals("android.permission.ACCESS_MOCK_LOCATION")
+                                && !applicationInfo.packageName.equals(context.getPackageName())) {
+                            count++;
+                        }
+                    }
+                }
+            } catch (PackageManager.NameNotFoundException e) {
+                Log.e("Got exception " , e.getMessage());
+            }
+        }
+
+        if (count > 0)
+            return true;
+        return false;
+    }
+
 }
