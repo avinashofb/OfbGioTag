@@ -1,5 +1,7 @@
 package vapp.ofbusiness.com.ofbgiotag;
 
+import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Point;
 import android.location.Address;
 import android.location.Geocoder;
@@ -30,6 +32,9 @@ public class ChooseLocationActivity extends AppCompatActivity implements  MapWra
     private GoogleMap googleMap;
     private ChooseLocationMapFragment mCustomMapFragment;
 
+    public static final String ARG_SELECTED_LAT = "correctLat";
+    public static final String ARG_SELECTED_LONG = "correctLong";
+
     private View mMarkerParentView;
     private ImageView mMarkerImageView;
 
@@ -56,16 +61,23 @@ public class ChooseLocationActivity extends AppCompatActivity implements  MapWra
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_choose_locatio_new);
 
-        mLocationTextView = (TextView) findViewById(R.id.location_text_view);
+        mLocationTextView = findViewById(R.id.location_text_view);
         mMarkerParentView = findViewById(R.id.marker_view_incl);
-        mMarkerImageView = (ImageView) findViewById(R.id.marker_icon_view);
+        mMarkerImageView = findViewById(R.id.marker_icon_view);
         updateLocation = findViewById(R.id.update_location_bt);
 
         updateLocation.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 if(isCurrentLocationInsideCircle){
+                    Intent returnIntent = new Intent();
+                    returnIntent.putExtra(ARG_SELECTED_LAT,correctedLat);
+                    returnIntent.putExtra(ARG_SELECTED_LONG,correctedLong);
+                    setResult(Activity.RESULT_OK,returnIntent);
                     finish();
+                }else{
+                    Toast.makeText(ChooseLocationActivity.this, "Please select in" +
+                            "side the Circular Region",Toast.LENGTH_LONG).show();
                 }
             }
         });
@@ -151,7 +163,6 @@ public class ChooseLocationActivity extends AppCompatActivity implements  MapWra
             Geocoder geocoder = new Geocoder(ChooseLocationActivity.this, Locale.getDefault());
 
             if(MapUtils.getDisplacementBetweenCoordinates(incorrectLat, incorrectLong, centerLatLng.latitude, centerLatLng.longitude) > 100){
-                Toast.makeText(this, "Please select inside the Circular Region",Toast.LENGTH_LONG).show();
                 updateLocation.setBackgroundColor(getResources().getColor(R.color.rejectBtColor));
                 mLocationTextView.setText("-");
                 isCurrentLocationInsideCircle = false;

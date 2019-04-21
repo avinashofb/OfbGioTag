@@ -13,7 +13,7 @@
         <Button
             android:id="@+id/photo_button"
             style="?android:attr/borderlessButtonStyle"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:drawableLeft="@drawable/ic_add_a_photo_grey_700_24dp"
             android:paddingRight="30dp"

@@ -44,10 +44,10 @@ import java.util.List;
 
 public class GeoTaggingActivity extends AppCompatActivity implements OnMapReadyCallback {
 
-    private static float DEFAULT_CAMERA_ZOOM = 18f;
+    private static final int FINISHING_ACTIVITY_RESULT_CODE = 121;
 
     private ImageView imageHolder;
-    private final int requestCode = 20;
+    private static final int CAMERA_REQUEST_CODE = 123;
     private View acceptOrRejectContainer;
     private Button acceptButton, rejectButton, capturedImageButton;
     private TextView geoAddress;
@@ -66,6 +66,9 @@ public class GeoTaggingActivity extends AppCompatActivity implements OnMapReadyC
     String imgLongRef = "";
     Float geoTaggedLat;
     Float geoTaggedLong;
+
+    double selectedLat;
+    double selectedLong;
 
     private boolean isGeotaggedLocation;
 
@@ -114,7 +117,7 @@ public class GeoTaggingActivity extends AppCompatActivity implements OnMapReadyC
                 Intent intent = new Intent(getBaseContext(), ChooseLocationActivity.class);
                 intent.putExtra("LAT", lastKnownLocation.getLatitude());
                 intent.putExtra("LONG", lastKnownLocation.getLongitude());
-                startActivity(intent);
+                startActivityForResult(intent, FINISHING_ACTIVITY_RESULT_CODE);
             }
         });
 
@@ -124,9 +127,9 @@ public class GeoTaggingActivity extends AppCompatActivity implements OnMapReadyC
 
     }
 
-    private void openCamera(){
+    private void openCamera() {
         Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        startActivityForResult(intent, requestCode);
+        startActivityForResult(intent, CAMERA_REQUEST_CODE);
     }
 
     @Override
@@ -142,70 +145,107 @@ public class GeoTaggingActivity extends AppCompatActivity implements OnMapReadyC
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (this.requestCode == requestCode && resultCode == RESULT_OK) {
-            Bitmap bitmap = (Bitmap) data.getExtras().get("data");
-            Uri tempUri = getImageUri(getApplicationContext(), bitmap);
-            File finalFile = new File(getRealPathFromURI(tempUri));
+        switch (requestCode) {
+            case CAMERA_REQUEST_CODE:
+                if (resultCode == RESULT_OK) {
+                    Bitmap bitmap = (Bitmap) data.getExtras().get("data");
+                    Uri tempUri = getImageUri(getApplicationContext(), bitmap);
+                    File finalFile = new File(getRealPathFromURI(tempUri));
 
-            if(finalFile != null) {
-                try {
-                    ExifInterface exifInterface = new ExifInterface(finalFile.toString());
-                    imgLat = exifInterface.getAttribute(ExifInterface.TAG_GPS_LATITUDE);
-                    imgLong = exifInterface.getAttribute(ExifInterface.TAG_GPS_LONGITUDE);
-                    imgLatRef = exifInterface.getAttribute(ExifInterface.TAG_GPS_LATITUDE_REF);
-                    imgLongRef = exifInterface.getAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF);
+                    if (finalFile != null) {
+                        try {
+                            ExifInterface exifInterface = new ExifInterface(finalFile.toString());
+                            imgLat = exifInterface.getAttribute(ExifInterface.TAG_GPS_LATITUDE);
+                            imgLong = exifInterface.getAttribute(ExifInterface.TAG_GPS_LONGITUDE);
+                            imgLatRef = exifInterface.getAttribute(ExifInterface.TAG_GPS_LATITUDE_REF);
+                            imgLongRef = exifInterface.getAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF);
 
 
-                if (imgLat != null || imgLong != null) {
+                            if (imgLat != null || imgLong != null) {
 
-                    if (imgLatRef != null && imgLatRef.equals("N")) {
-                        geoTaggedLat = locationConvertToDegree(imgLat);
-                    } else {
-                        geoTaggedLat = 0f - locationConvertToDegree(imgLat);
+                                if (imgLatRef != null && imgLatRef.equals("N")) {
+                                    geoTaggedLat = locationConvertToDegree(imgLat);
+                                } else {
+                                    geoTaggedLat = 0f - locationConvertToDegree(imgLat);
+                                }
+                                Log.d("GIO_TAG_LAT", String.valueOf(geoTaggedLat));
+
+                                if (imgLongRef != null && imgLongRef.equals("E")) {
+                                    geoTaggedLong = locationConvertToDegree(imgLong);
+                                } else {
+                                    geoTaggedLong = 0f - locationConvertToDegree(imgLong);
+                                }
+                                Log.d("GIO_TAG_LONG", String.valueOf(geoTaggedLong));
+                            }
+
+                        } catch (IOException e) {
+                            Log.e("", "Error occurred while fetching location from Image" + e);
+                        }
+
                     }
-                    Log.d("GIO_TAG_LAT", String.valueOf(geoTaggedLat));
-
-                    if (imgLongRef != null && imgLongRef.equals("E")) {
-                        geoTaggedLong = locationConvertToDegree(imgLong);
+                    imageHolder.setImageBitmap(bitmap);
+                    mGoogleMap.clear();
+                    capturedImageButton.setVisibility(View.GONE);
+                    acceptOrRejectContainer.setVisibility(View.VISIBLE);
+                    mapWarningView.setVisibility(View.GONE);
+                    geoAddress.setVisibility(View.VISIBLE);
+                    if ((geoTaggedLat == null && geoTaggedLong == null) || (geoTaggedLat.equals(0.0) && geoTaggedLong.equals(0.0))) {
+                        ifImageIsNotGeoTagged();
                     } else {
-                        geoTaggedLong = 0f - locationConvertToDegree(imgLong);
+                        ifImageIsGeoTagged();
                     }
-                    Log.d("GIO_TAG_LONG", String.valueOf(geoTaggedLong));
                 }
+                break;
 
-                } catch (IOException e) {
-                    Log.e("","Error occurred while fetching location from Image" + e);
+            case FINISHING_ACTIVITY_RESULT_CODE:
+                if (resultCode == Activity.RESULT_OK) {
+                    if(data.getExtras().containsKey(ChooseLocationActivity.ARG_SELECTED_LAT)) {
+                        selectedLat = data.getDoubleExtra(ChooseLocationActivity.ARG_SELECTED_LAT, 0);
+                        selectedLong = data.getDoubleExtra(ChooseLocationActivity.ARG_SELECTED_LONG, 0);
+                        mGoogleMap.clear();
+                        MapUtils.addMarker(lastKnownLocation.getLatitude(), lastKnownLocation.getLongitude(), "Last Location", mapMarker, mGoogleMap, BitmapDescriptorFactory.fromResource(R.drawable.ic_location_off_red_700_36dp));
+                        MapUtils.addMarker(selectedLat, selectedLong, "Updated Location", mapMarker, mGoogleMap, BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
+                        MapUtils.moveCameraToLocation(selectedLat, selectedLong,mGoogleMap);
+                        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                                mGoogleMap.setMyLocationEnabled(false);
+                            }
+                        }
+                    }
                 }
+                break;
 
+
+        }
+    }
+
+    private void ifImageIsNotGeoTagged(){
+        isGeotaggedLocation = false;
+        Toast.makeText(this, "Is Gio-Tagged Location - " + isGeotaggedLocation, Toast.LENGTH_LONG).show();
+        geoTaggedLong = Float.parseFloat(String.valueOf(lastKnownLocation.getLongitude()));
+        geoTaggedLat = Float.parseFloat(String.valueOf(lastKnownLocation.getLatitude()));
+        if(selectedLat != 0d || selectedLong != 0d){
+            geoAddress.setText(MapUtils.getCompleteAddress(selectedLat, selectedLong, this));
+            MapUtils.addMarker(selectedLat, selectedLong, "Clicked Image Location", mapMarker, mGoogleMap, BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
+        }else {
+            geoAddress.setText(MapUtils.getCompleteAddress(geoTaggedLat, geoTaggedLong, this));
+            MapUtils.addMarker(geoTaggedLat, geoTaggedLong, "Clicked Image Location", mapMarker, mGoogleMap, BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
+        }
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                mGoogleMap.setMyLocationEnabled(false);
             }
-            imageHolder.setImageBitmap(bitmap);
-            mGoogleMap.clear();
-            capturedImageButton.setVisibility(View.GONE);
-            acceptOrRejectContainer.setVisibility(View.VISIBLE);
-            mapWarningView.setVisibility(View.GONE);
-            geoAddress.setVisibility(View.VISIBLE);
-            if((geoTaggedLat == null && geoTaggedLong == null) || (geoTaggedLat.equals(0.0) && geoTaggedLong.equals(0.0))) {
-                isGeotaggedLocation = false;
-                Toast.makeText(this,"Is Gio-Tagged Location - " + isGeotaggedLocation,Toast.LENGTH_LONG).show();
-                geoTaggedLong = Float.parseFloat(String.valueOf(lastKnownLocation.getLongitude()));
-                geoTaggedLat = Float.parseFloat(String.valueOf(lastKnownLocation.getLatitude()));
-                geoAddress.setText(MapUtils.getCompleteAddress(geoTaggedLat, geoTaggedLong, this));
-                MapUtils.addMarker(geoTaggedLat, geoTaggedLong, "Clicked Image Location", mapMarker, mGoogleMap, BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
-                if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                        mGoogleMap.setMyLocationEnabled(false);
-                    }
-                }
-            }else{
-                isGeotaggedLocation = true;
-                Toast.makeText(this,"Is Gio-Tagged Location - " + isGeotaggedLocation,Toast.LENGTH_LONG).show();
-                geoAddress.setText(MapUtils.getCompleteAddress(geoTaggedLat, geoTaggedLong, this));
-                MapUtils.addMarker(geoTaggedLat, geoTaggedLong, "Clicked Image Location", mapMarker, mGoogleMap, BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
-                if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                        mGoogleMap.setMyLocationEnabled(false);
-                    }
-                }
+        }
+    }
+
+    private void ifImageIsGeoTagged(){
+        isGeotaggedLocation = true;
+        Toast.makeText(this, "Is Gio-Tagged Location - " + isGeotaggedLocation, Toast.LENGTH_LONG).show();
+        geoAddress.setText(MapUtils.getCompleteAddress(geoTaggedLat, geoTaggedLong, this));
+        MapUtils.addMarker(geoTaggedLat, geoTaggedLong, "Clicked Image Location", mapMarker, mGoogleMap, BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                mGoogleMap.setMyLocationEnabled(false);
             }
         }
     }
@@ -231,26 +271,26 @@ public class GeoTaggingActivity extends AppCompatActivity implements OnMapReadyC
         return path;
     }
 
-    public static Float locationConvertToDegree(String stringDMS){
+    public static Float locationConvertToDegree(String stringDMS) {
         Float result = null;
         String[] DMS = stringDMS.split(",", 3);
 
         String[] stringD = DMS[0].split("/", 2);
         Double D0 = new Double(stringD[0]);
         Double D1 = new Double(stringD[1]);
-        Double FloatD = D0/D1;
+        Double FloatD = D0 / D1;
 
         String[] stringM = DMS[1].split("/", 2);
         Double M0 = new Double(stringM[0]);
         Double M1 = new Double(stringM[1]);
-        Double FloatM = M0/M1;
+        Double FloatM = M0 / M1;
 
         String[] stringS = DMS[2].split("/", 2);
         Double S0 = new Double(stringS[0]);
         Double S1 = new Double(stringS[1]);
-        Double FloatS = S0/S1;
+        Double FloatS = S0 / S1;
 
-        result = new Float(FloatD + (FloatM/60) + (FloatS/3600));
+        result = new Float(FloatD + (FloatM / 60) + (FloatS / 3600));
 
         return result;
 
@@ -269,23 +309,9 @@ public class GeoTaggingActivity extends AppCompatActivity implements OnMapReadyC
         mGoogleMap.getUiSettings().setZoomControlsEnabled(true);
         mGoogleMap.getUiSettings().setMyLocationButtonEnabled(true);
 
-        if (checkPermissionForExternalStorage(this)) {
-        }
 
-        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                    == PackageManager.PERMISSION_GRANTED) {
-                //Location Permission already granted
-                mFusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback, Looper.myLooper());
-                mGoogleMap.setMyLocationEnabled(true);
-            } else {
-                //Request Location Permission
-                checkLocationPermission();
-            }
-        } else {
-            mFusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback, Looper.myLooper());
-            mGoogleMap.setMyLocationEnabled(true);
-        }
+        checkPermissionForExternalStorage(this);
+
     }
 
     LocationCallback mLocationCallback = new LocationCallback() {
@@ -304,7 +330,7 @@ public class GeoTaggingActivity extends AppCompatActivity implements OnMapReadyC
 
     public static final int MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE = 123;
 
-    private boolean checkPermissionForExternalStorage(final Context context){
+    private boolean checkPermissionForExternalStorage(final Context context) {
         int currentAPIVersion = Build.VERSION.SDK_INT;
         if (currentAPIVersion >= android.os.Build.VERSION_CODES.M) {
             if (ContextCompat.checkSelfPermission(context,
@@ -318,16 +344,34 @@ public class GeoTaggingActivity extends AppCompatActivity implements OnMapReadyC
                     ActivityCompat
                             .requestPermissions(
                                     (Activity) context,
-                                    new String[] { Manifest.permission.READ_EXTERNAL_STORAGE },
+                                    new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
                                     MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE);
                 }
                 return false;
             } else {
+                checkForLocationPermission();
                 return true;
             }
 
         } else {
             return true;
+        }
+    }
+
+    private void checkForLocationPermission(){
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                    == PackageManager.PERMISSION_GRANTED) {
+                //Location Permission already granted
+                mFusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback, Looper.myLooper());
+                mGoogleMap.setMyLocationEnabled(true);
+            } else {
+                //Request Location Permission
+                checkLocationPermission();
+            }
+        } else {
+            mFusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback, Looper.myLooper());
+            mGoogleMap.setMyLocationEnabled(true);
         }
     }
 
@@ -340,7 +384,7 @@ public class GeoTaggingActivity extends AppCompatActivity implements OnMapReadyC
                 new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int which) {
                         ActivityCompat.requestPermissions((Activity) context,
-                                new String[] { permission },
+                                new String[]{permission},
                                 MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE);
                     }
                 });
@@ -391,15 +435,11 @@ public class GeoTaggingActivity extends AppCompatActivity implements OnMapReadyC
         switch (requestCode) {
             case MY_PERMISSIONS_REQUEST_LOCATION: {
                 // If request is cancelled, the result arrays are empty.
-                if (grantResults.length > 0
-                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
 
                     // permission was granted, yay! Do the
                     // location-related task you need to do.
-                    if (ContextCompat.checkSelfPermission(this,
-                            Manifest.permission.ACCESS_FINE_LOCATION)
-                            == PackageManager.PERMISSION_GRANTED) {
-
+                    if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                         mFusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback, Looper.myLooper());
                         mGoogleMap.setMyLocationEnabled(true);
                     }
@@ -416,9 +456,10 @@ public class GeoTaggingActivity extends AppCompatActivity implements OnMapReadyC
             case MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE:
                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     // do your stuff
+                    checkForLocationPermission();
                 } else {
-                    Toast.makeText(GeoTaggingActivity.this, "GET_ACCOUNTS Denied",
-                            Toast.LENGTH_SHORT).show();
+                    Toast.makeText(GeoTaggingActivity.this, "GET_ACCOUNTS Denied", Toast.LENGTH_SHORT).show();
+                    checkForLocationPermission();
                 }
                 break;
         }
