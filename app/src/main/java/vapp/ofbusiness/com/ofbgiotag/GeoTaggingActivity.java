@@ -53,22 +53,24 @@ public class GeoTaggingActivity extends AppCompatActivity implements OnMapReadyC
     private TextView geoAddress;
     private TextView mapWarningView;
 
-    GoogleMap mGoogleMap;
-    SupportMapFragment mapFrag;
-    LocationRequest mLocationRequest;
-    Location lastKnownLocation;
-    Marker mapMarker;
-    FusedLocationProviderClient mFusedLocationClient;
+    private GoogleMap mGoogleMap;
+    private SupportMapFragment mapFrag;
+    private LocationRequest mLocationRequest;
+    private Location lastKnownLocation;
+    private Marker mapMarker;
+    private FusedLocationProviderClient mFusedLocationClient;
 
-    String imgLat = "";
-    String imgLong = "";
-    String imgLatRef = "";
-    String imgLongRef = "";
-    Float geoTaggedLat;
-    Float geoTaggedLong;
+    private String imgLat = "";
+    private String imgLong = "";
+    private String imgLatRef = "";
+    private String imgLongRef = "";
+    private Float geoTaggedLat;
+    private Float geoTaggedLong;
 
-    double selectedLat;
-    double selectedLong;
+    private double selectedLat;
+    private double selectedLong;
+
+    private double distanceBetweenClickedLocation;
 
     private boolean isGeotaggedLocation;
 
@@ -90,7 +92,8 @@ public class GeoTaggingActivity extends AppCompatActivity implements OnMapReadyC
         acceptOrRejectContainer.setVisibility(View.GONE);
         mapWarningView.setVisibility(View.VISIBLE);
         mapWarningView.setText("This is your current Location. If you're not satisfied please find manually by clicking here.");
-        if(MapUtils.areThereMockPermissionApps(this)){
+
+        if(!MapUtils.areThereMockPermissionApps(this)){
                 AlertDialog.Builder alertBuilder = new AlertDialog.Builder(this);
                 alertBuilder.setCancelable(false);
                 alertBuilder.setTitle("Uninstall GPS spoofing Application !");
@@ -109,7 +112,14 @@ public class GeoTaggingActivity extends AppCompatActivity implements OnMapReadyC
         acceptButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-
+                String isGeoTagged =  Boolean.toString(isGeotaggedLocation);
+                String address = MapUtils.getCompleteAddress(geoTaggedLat, geoTaggedLong, GeoTaggingActivity.this);
+                if(selectedLat != 0 || selectedLong != 0) {
+                    distanceBetweenClickedLocation = MapUtils.getDisplacementBetweenCoordinates(geoTaggedLat.doubleValue(), geoTaggedLong.doubleValue(), selectedLat, selectedLong);
+                }else{
+                    distanceBetweenClickedLocation = MapUtils.getDisplacementBetweenCoordinates(geoTaggedLat.doubleValue(), geoTaggedLong.doubleValue(), lastKnownLocation.getLatitude(), lastKnownLocation.getLongitude());
+                }
+                Toast.makeText(GeoTaggingActivity.this, " Is GioTagged - " + isGeoTagged + " Address - " + address + "Distance - " + String.valueOf(distanceBetweenClickedLocation) , Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -233,13 +243,16 @@ public class GeoTaggingActivity extends AppCompatActivity implements OnMapReadyC
         Toast.makeText(this, "Is Gio-Tagged Location - " + isGeotaggedLocation, Toast.LENGTH_LONG).show();
         geoTaggedLong = Float.parseFloat(String.valueOf(lastKnownLocation.getLongitude()));
         geoTaggedLat = Float.parseFloat(String.valueOf(lastKnownLocation.getLatitude()));
-        if(selectedLat != 0d || selectedLong != 0d){
-            geoAddress.setText(MapUtils.getCompleteAddress(selectedLat, selectedLong, this));
-            MapUtils.addMarker(selectedLat, selectedLong, "Clicked Image Location", mapMarker, mGoogleMap, BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
-        }else {
-            geoAddress.setText(MapUtils.getCompleteAddress(geoTaggedLat, geoTaggedLong, this));
-            MapUtils.addMarker(geoTaggedLat, geoTaggedLong, "Clicked Image Location", mapMarker, mGoogleMap, BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
-        }
+//        if(selectedLat != 0d || selectedLong != 0d){
+//            geoAddress.setText(MapUtils.getCompleteAddress(selectedLat, selectedLong, this));
+//            MapUtils.addMarker(selectedLat, selectedLong, "Clicked Image Location", mapMarker, mGoogleMap, BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
+//        }else {
+//            geoAddress.setText(MapUtils.getCompleteAddress(geoTaggedLat, geoTaggedLong, this));
+//            MapUtils.addMarker(geoTaggedLat, geoTaggedLong, "Clicked Image Location", mapMarker, mGoogleMap, BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
+//        }
+
+        geoAddress.setText(MapUtils.getCompleteAddress(geoTaggedLat, geoTaggedLong, this));
+        MapUtils.addMarker(geoTaggedLat, geoTaggedLong, "Clicked Image Location", mapMarker, mGoogleMap, BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
         if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 mGoogleMap.setMyLocationEnabled(false);
